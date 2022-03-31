@@ -4,7 +4,7 @@ from catkin_pkg.python_setup import generate_distutils_setup
 
 setup_args = generate_distutils_setup(
     packages=[
-        'my_python_package'
+        'np_bridge'
     ],
     package_dir={'': 'include'},
 )
