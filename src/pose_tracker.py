@@ -12,6 +12,8 @@ from scipy.spatial import distance
 from sensor_msgs.msg import Image
 from std_msgs.msg import Int64MultiArray
 
+SIZE20M = 20 * 1024 * 1024
+
 
 class CentroidTracker:
     def __init__(self, depth_th=5000, timeout=3):
@@ -65,9 +67,9 @@ class PoseTracker:
         self.cv_bridge = CvBridge()
         self.tracker = CentroidTracker()
         rospy.init_node('pose_tracker')
-        rospy.Subscriber('/camera/aligned_depth_to_color/image_raw', Image, callback=self.depth_callback, queue_size=10)
-        rospy.Subscriber('/estimated_poses', Int64MultiArray, callback=self.pose_callback, queue_size=10)
-        self.pub_pose = rospy.Publisher('/tracked_poses', Int64MultiArray, queue_size=10)
+        rospy.Subscriber('/camera/aligned_depth_to_color/image_raw', Image, callback=self.depth_callback, queue_size=1, buff_size=SIZE20M)
+        rospy.Subscriber('/estimated_poses', Int64MultiArray, callback=self.pose_callback, queue_size=1)
+        self.pub_pose = rospy.Publisher('/tracked_poses', Int64MultiArray, queue_size=1)
         # self.pub_depth = rospy.Publisher('filtered_depth', Image, queue_size=1)
         rospy.loginfo('Pose Tracker Node is Up!')
         rospy.spin()
@@ -90,7 +92,7 @@ class PoseTracker:
                 valid_id2id[valid_id] = id
                 valid_id += 1
         # depths = [self.depth[c[1], c[0]] for c in centroids]
-        depths = [1000 for c in centroids]
+        depths = [1000] * len(centroids)
         k = self.tracker.update(centroids, depths)
         h = np.zeros((n_objs, 1, 2), dtype=int)
         if k >= 0:

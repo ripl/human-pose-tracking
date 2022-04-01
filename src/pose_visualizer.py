@@ -12,6 +12,10 @@ from np_bridge import np_bridge
 from sensor_msgs.msg import Image
 from std_msgs.msg import Int64MultiArray
 
+SIZE20M = 20 * 1024 * 1024
+CIRCLE_RADIUS = 4
+BAXTER_HEAD_DISPLAY_RES = (1024, 600)
+
 
 class PoseVisualizer:
     def __init__(self) -> None:
@@ -23,8 +27,8 @@ class PoseVisualizer:
         self.img = None
         self.cv_bridge = CvBridge()
         rospy.init_node('pose_visualizer')
-        rospy.Subscriber('/camera/color/image_raw', Image, callback=self.img_callback, queue_size=1)
-        rospy.Subscriber('/tracked_poses', Int64MultiArray, callback=self.pose_callback, queue_size=10)
+        rospy.Subscriber('/camera/color/image_raw', Image, callback=self.img_callback, queue_size=1, buff_size=SIZE20M)
+        rospy.Subscriber('/tracked_poses', Int64MultiArray, callback=self.pose_callback, queue_size=1)
         self.pub = rospy.Publisher('/robot/xdisplay', Image, queue_size=1)
         rospy.loginfo('Pose Visualizer Node is Up!')
         rospy.spin()
@@ -40,14 +44,17 @@ class PoseVisualizer:
             for j_kp in range(poses.shape[1] - 1):
                 x, y = poses[i_obj, j_kp]
                 if x >= 0 and y >= 0:
-                    cv2.circle(img, (x, y), 20, color, -1)
+                    cv2.circle(img, (x, y), CIRCLE_RADIUS, color, -1)
             for k in range(self.topology.shape[0]):
                 c_a = self.topology[k][2]
                 c_b = self.topology[k][3]
                 if np.all(poses[i_obj][c_a] >= 0) and np.all(poses[i_obj][c_b] >= 0):
                     x0, y0 = poses[i_obj, c_a]
                     x1, y1 = poses[i_obj, c_b]
-                    cv2.line(img, (x0, y0), (x1, y1), color, 10)
+                    cv2.line(img, (x0, y0), (x1, y1), color, 3)
+
+        img = cv2.resize(img, BAXTER_HEAD_DISPLAY_RES)
+
         img_msg = self.cv_bridge.cv2_to_imgmsg(img[:, ::-1], encoding='bgr8')
         self.pub.publish(img_msg)
 
