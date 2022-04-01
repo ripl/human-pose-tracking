@@ -5,6 +5,7 @@ import os
 from queue import Queue
 from threading import Thread
 
+import cv2
 import numpy as np
 import rospy
 import torch
@@ -43,8 +44,6 @@ class PoseEstimator:
 
         self.cv_bridge = CvBridge()
 
-        self.left_crop = 0.0
-        self.right_crop = 0.0
         self.trt_expected_w = 224
         self.trt_expected_h = 224
         self.roi = None
@@ -52,16 +51,16 @@ class PoseEstimator:
         num_buffers = 2
         self._queue_used = Queue(num_buffers)
         self._queue_ready = Queue(num_buffers)
-        self._estimator = Thread(target=self._estimate, daemon=True)
+        self._estimator = Thread(target=self._estimate)
         for _ in range(num_buffers):
             self._queue_used.put(
-                torch.zeros(
+                torch.empty(
                     (3, self.trt_expected_h, self.trt_expected_w),
                     device=self.device,
                     dtype=torch.uint8
                 )
             )
-        self._input = torch.zeros(
+        self._input = torch.empty(
             (3, self.trt_expected_h, self.trt_expected_w),
             device=self.device,
             dtype=torch.float
@@ -81,26 +80,32 @@ class PoseEstimator:
         rospy.loginfo('Pose Estimator Node is Up!')
         rospy.spin()
 
+    def callback(self, data):
+        img = self.cv_bridge.imgmsg_to_cv2(data, desired_encoding='rgb8')
+        if self.roi is None:
+            h, w = img.shape[:2]
+            self.roi = (0, h, 0, w)
+        img = cv2.resize(img, (self.trt_expected_w, self.trt_expected_h))
+        buf = self._queue_used.get()
+        buf.copy_(torch.from_numpy(img.transpose(2, 0, 1)))
+        self._queue_ready.put(buf)
+
     def _estimate(self):
         while not rospy.is_shutdown():
-            buf_uint = self._queue_ready.get()
-            buf = self._input.copy_(buf_uint).div_(255.0)
+            buf = self._queue_ready.get()
+            data = self._input.copy_(buf).div_(255.0)
+            self._queue_used.put(buf)
 
-            # send to TRT pose
-            # data = transforms.functional.to_tensor(img).to(self.device)
-            buf.sub_(self.mean).div_(self.std)
-            data = buf[None, ...]
+            # send to TRT Pose
+            data.sub_(self.mean).div_(self.std)
             with torch.no_grad():
-                cmap, paf = self.model_trt(data)
+                cmap, paf = self.model_trt(data[None, ...])
             cmap, paf = cmap.cpu(), paf.cpu()
             # topology: shape=[n_bones, 4]
             # counts: shape=[1]
             # objects: shape=[1, n_obj_candidates, n_kps(=18)]
             # peaks: shape=[1, n_kps(=18), n_kp_candidates, 2]
             counts, objects, peaks = self.parse_objects(cmap, paf)
-
-            # free buffer
-            self._queue_used.put(buf_uint)
 
             # pose_data: shape=[n_objs, n_kps(=18), 2]
             n_objs = counts.item()
@@ -118,20 +123,6 @@ class PoseEstimator:
                     ]
 
             self.pub.publish(np_bridge.to_multiarray_i64(poses))
-
-    def callback(self, data):
-        buf_uint = self._queue_used.get()
-        img = self.cv_bridge.imgmsg_to_cv2(data, desired_encoding='rgb8')
-
-        # perform crop some pixels off left and right (t, b, l, r)
-        if self.roi is None:
-            h, w, _ = img.shape
-            t, l = 0, int((w - self.trt_expected_w) / 2)
-            self.roi = (t, t + self.trt_expected_h, l, l + self.trt_expected_w)
-
-        img = img[self.roi[0]:self.roi[1], self.roi[2]:self.roi[3]]
-        buf_uint.copy_(torch.from_numpy(img.transpose(2, 0, 1)))
-        self._queue_ready.put(buf_uint)
 
 
 if __name__ == '__main__':

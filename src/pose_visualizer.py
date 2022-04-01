@@ -14,6 +14,7 @@ from std_msgs.msg import Int64MultiArray
 
 SIZE20M = 20 * 1024 * 1024
 CIRCLE_RADIUS = 4
+LINE_THICKNESS = 3
 BAXTER_HEAD_DISPLAY_RES = (1024, 600)
 
 
@@ -51,7 +52,7 @@ class PoseVisualizer:
                 if np.all(poses[i_obj][c_a] >= 0) and np.all(poses[i_obj][c_b] >= 0):
                     x0, y0 = poses[i_obj, c_a]
                     x1, y1 = poses[i_obj, c_b]
-                    cv2.line(img, (x0, y0), (x1, y1), color, 3)
+                    cv2.line(img, (x0, y0), (x1, y1), color, LINE_THICKNESS)
 
         img = cv2.resize(img, BAXTER_HEAD_DISPLAY_RES)
 

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3.6
 
-import re
 from time import time
 
 import numpy as np
