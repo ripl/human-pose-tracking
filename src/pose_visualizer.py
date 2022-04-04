@@ -45,7 +45,11 @@ class PoseVisualizer:
             for j_kp in range(poses.shape[1] - 1):
                 x, y = poses[i_obj, j_kp]
                 if x >= 0 and y >= 0:
-                    cv2.circle(img, (x, y), CIRCLE_RADIUS, color, -1)
+                    try:
+                        cv2.circle(img, (x, y), CIRCLE_RADIUS, color, -1)
+                    except cv2.error as e:
+                        pass
+
             for k in range(self.topology.shape[0]):
                 c_a = self.topology[k][2]
                 c_b = self.topology[k][3]

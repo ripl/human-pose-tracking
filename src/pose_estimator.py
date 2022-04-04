@@ -16,8 +16,10 @@ from sensor_msgs.msg import Image
 from std_msgs.msg import Int64MultiArray
 from torch2trt import TRTModule
 from trt_pose.parse_objects import ParseObjects
+from geometry_msgs.msg import Point, PointStamped
 
-SIZE20M = 20 * 1024 * 1024
+
+SIZE40M = 40 * 1024 * 1024
 
 
 class PoseEstimator:
@@ -47,6 +49,8 @@ class PoseEstimator:
         self.trt_expected_w = 224
         self.trt_expected_h = 224
         self.roi = None
+        self.scale = None
+        self.shift = None
 
         num_buffers = 2
         self._queue_used = Queue(num_buffers)
@@ -66,15 +70,38 @@ class PoseEstimator:
             dtype=torch.float
         )
 
+        self._cmap = torch.empty(
+            (1, 18, 56, 56),
+            device=self.device,
+            dtype=torch.float16
+        )
+        self._paf = torch.empty(
+            (1, 42, 56, 56),
+            device=self.device,
+            dtype=torch.float16
+        )
+
+        self._cmap_cpu = torch.empty(
+            (1, 18, 56, 56),
+            dtype=torch.float32
+        )
+        self._paf_cpu = torch.empty(
+            (1, 42, 56, 56),
+            dtype=torch.float32
+        )
+
         rospy.init_node('pose_estimator')
         rospy.Subscriber('/camera/color/image_raw',
                          Image,
                          callback=self.callback,
                          queue_size=1,
-                         buff_size=SIZE20M)
+                         buff_size=SIZE40M)
         self.pub = rospy.Publisher('/estimated_poses',
                                    Int64MultiArray,
                                    queue_size=1)
+        self.hpub = rospy.Publisher('/estimated_poses/header',
+                                    PointStamped,
+                                    queue_size=1)
 
         self._estimator.start()
         rospy.loginfo('Pose Estimator Node is Up!')
@@ -82,47 +109,62 @@ class PoseEstimator:
 
     def callback(self, data):
         img = self.cv_bridge.imgmsg_to_cv2(data, desired_encoding='rgb8')
+
         if self.roi is None:
             h, w = img.shape[:2]
             self.roi = (0, h, 0, w)
+            # self.roi = (0, 224, 0, 224)
+            self.scale = np.array([(self.roi[1] - self.roi[0]),
+                                   (self.roi[3] - self.roi[2])])
+            self.shift = np.array([self.roi[0], self.roi[2]])
+
         img = cv2.resize(img, (self.trt_expected_w, self.trt_expected_h))
+        # img = img[self.roi[0]:self.roi[1], self.roi[2]:self.roi[3]]
+
         buf = self._queue_used.get()
+
         buf.copy_(torch.from_numpy(img.transpose(2, 0, 1)))
-        self._queue_ready.put(buf)
+
+        self._queue_ready.put((data.header, buf))
 
     def _estimate(self):
         while not rospy.is_shutdown():
-            buf = self._queue_ready.get()
+            header, buf = self._queue_ready.get()
+
             data = self._input.copy_(buf).div_(255.0)
+
             self._queue_used.put(buf)
 
             # send to TRT Pose
             data.sub_(self.mean).div_(self.std)
             with torch.no_grad():
                 cmap, paf = self.model_trt(data[None, ...])
-            cmap, paf = cmap.cpu(), paf.cpu()
+
+            self._cmap.copy_(cmap)
+            self._paf.copy_(paf)
+
+            self._cmap_cpu.copy_(self._cmap)
+            self._paf_cpu.copy_(self._paf)
+
             # topology: shape=[n_bones, 4]
             # counts: shape=[1]
             # objects: shape=[1, n_obj_candidates, n_kps(=18)]
             # peaks: shape=[1, n_kps(=18), n_kp_candidates, 2]
-            counts, objects, peaks = self.parse_objects(cmap, paf)
+            counts, objects, peaks = self.parse_objects(self._cmap_cpu, self._paf_cpu)
 
-            # pose_data: shape=[n_objs, n_kps(=18), 2]
+            peaks = (peaks * self.scale + self.shift).flip(-1)
             n_objs = counts.item()
             n_kps = objects.shape[2]
+            objects = objects[0, :n_objs].long()
             poses = np.full((n_objs, n_kps, 2), -1, dtype=int)
             for i_obj in range(n_objs):
-                for j_kp in range(n_kps):
-                    k = objects[0][i_obj][j_kp]
-                    if k < 0:
-                        continue
-                    p = peaks[0][j_kp][k]
-                    poses[i_obj, j_kp] = [
-                        self.roi[2] + (self.roi[3] - self.roi[2]) * p[1],
-                        self.roi[0] + (self.roi[1] - self.roi[0]) * p[0]
-                    ]
+                ks = objects[i_obj]
+                inds = torch.nonzero(ks >= 0).long()
+                poses[i_obj, inds] = peaks[0, inds, ks[inds]]
 
             self.pub.publish(np_bridge.to_multiarray_i64(poses))
+            # NOTE: this is only used so that we can do `rostopic delay`
+            self.hpub.publish(PointStamped(header, Point(0, 0, 0)))
 
 
 if __name__ == '__main__':
