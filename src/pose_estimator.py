@@ -11,13 +11,12 @@ import rospy
 import torch
 import trt_pose.coco
 from cv_bridge import CvBridge
+from geometry_msgs.msg import Point, PointStamped
 from np_bridge import np_bridge
 from sensor_msgs.msg import Image
 from std_msgs.msg import Int64MultiArray
 from torch2trt import TRTModule
 from trt_pose.parse_objects import ParseObjects
-from geometry_msgs.msg import Point, PointStamped
-
 
 SIZE40M = 40 * 1024 * 1024
 
@@ -118,8 +117,9 @@ class PoseEstimator:
                                    (self.roi[3] - self.roi[2])])
             self.shift = np.array([self.roi[0], self.roi[2]])
 
-        img = cv2.resize(img, (self.trt_expected_w, self.trt_expected_h))
+        # NOTE: img cropping is disabled because roi is full
         # img = img[self.roi[0]:self.roi[1], self.roi[2]:self.roi[3]]
+        img = cv2.resize(img, (self.trt_expected_w, self.trt_expected_h))
 
         buf = self._queue_used.get()
 

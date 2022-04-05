@@ -15,7 +15,7 @@ SIZE20M = 20 * 1024 * 1024
 
 
 class CentroidTracker:
-    def __init__(self, depth_th=5000, timeout=3):
+    def __init__(self, depth_th=3000, timeout=3):
         self.depth_th = depth_th
         self.timeout = timeout
         self.nextObjectID = 0
@@ -57,7 +57,7 @@ class CentroidTracker:
                 self.unregister(objectID)
         for col in set(range(D.shape[1])).difference(set(cols)):
             self.register(centroids[col], t)
-        return k
+        return -1 if m is None else k
 
 
 class PoseTracker:
@@ -77,8 +77,8 @@ class PoseTracker:
         self.depth = self.cv_bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')
 
     def pose_callback(self, data):
-        # if self.depth is None:
-        #     return
+        if self.depth is None:
+            return
         poses = np_bridge.to_numpy_i64(data)
         centroids = poses[:, -1]
         is_valid = np.all(centroids >= 0, axis=1)
@@ -90,13 +90,12 @@ class PoseTracker:
             if is_valid[id]:
                 valid_id2id[valid_id] = id
                 valid_id += 1
-        # depths = [self.depth[c[1], c[0]] for c in centroids]
-        depths = [1000] * len(centroids)
+        depths = [self.depth[c[1], c[0]] for c in centroids]
         k = self.tracker.update(centroids, depths)
         h = np.zeros((n_objs, 1, 2), dtype=int)
         if k >= 0:
             id = valid_id2id[k]
-            h[id, 0] = 1
+            h[id, 0, 0] = 1
         tracked_poses = np.concatenate((poses, h), axis=1)
         self.pub_pose.publish(np_bridge.to_multiarray_i64(tracked_poses))
 
