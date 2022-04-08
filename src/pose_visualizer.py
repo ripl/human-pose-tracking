@@ -38,6 +38,8 @@ class PoseVisualizer:
         self.img = self.cv_bridge.imgmsg_to_cv2(data, desired_encoding='bgr8')
 
     def pose_callback(self, data):
+        if self.img is None:
+            return
         poses = np_bridge.to_numpy_i64(data)
         img = self.img.copy()
         for i_obj in range(poses.shape[0]):

@@ -71,7 +71,6 @@ class PoseTracker:
         rospy.Subscriber('/camera/aligned_depth_to_color/image_raw', Image, callback=self.depth_callback, queue_size=1, buff_size=SIZE20M)
         rospy.Subscriber('/estimated_poses', Int64MultiArray, callback=self.pose_callback, queue_size=1)
         self.pub_pose = rospy.Publisher('/tracked_poses', Int64MultiArray, queue_size=1)
-        # self.pub_depth = rospy.Publisher('filtered_depth', Image, queue_size=1)
         rospy.loginfo('Pose Tracker Node is Up!')
         rospy.spin()
 
@@ -83,7 +82,7 @@ class PoseTracker:
             return
         poses = np_bridge.to_numpy_i64(data)
         centroids = poses[:, -1]
-        is_valid = np.all(centroids >= 0, axis=1)
+        is_valid = np.logical_and(np.all(centroids >= 0, axis=1), np.sum(poses[:, 5:11, 0] >= 0, axis=1) >= 4)
         centroids = centroids[is_valid]
         valid_id2id = {}
         n_objs = is_valid.shape[0]
