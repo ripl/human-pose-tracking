@@ -15,8 +15,9 @@ SIZE20M = 20 * 1024 * 1024
 
 
 class CentroidTracker:
-    def __init__(self, depth_th=2500, timeout=1):
-        self.depth_th = depth_th
+    def __init__(self, depth_lo=500, depth_hi=2500, timeout=1):
+        self.depth_lo = depth_lo
+        self.depth_hi = depth_hi
         self.timeout = timeout
         self.nextObjectID = 0
         self.objects = {}
@@ -48,11 +49,9 @@ class CentroidTracker:
             obj = self.objects[objectIDs[row]]
             obj[0] = centroids[col]
             obj[2] = t
-            if depths[col] < self.depth_th and (m is None or obj[1] < m):
-            # if depths[col] < self.depth_th and (m is None or depths[col] < m):
+            if self.depth_lo < depths[col] < self.depth_hi and (m is None or obj[1] < m):
                 k = col
                 m = obj[1]
-                # m = depths[col]
         for row in set(range(D.shape[0])).difference(set(rows)):
             objectID = objectIDs[row]
             if t - self.objects[objectID][2] > self.timeout:
