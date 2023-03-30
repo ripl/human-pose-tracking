@@ -15,7 +15,7 @@ SIZE20M = 20 * 1024 * 1024
 
 
 class CentroidTracker:
-    def __init__(self, depth_lo=500, depth_hi=2500, timeout=1):
+    def __init__(self, depth_lo=1000, depth_hi=2000, timeout=0.5):
         self.depth_lo = depth_lo
         self.depth_hi = depth_hi
         self.timeout = timeout
