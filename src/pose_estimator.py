@@ -19,6 +19,7 @@ from torch2trt import TRTModule
 from trt_pose.parse_objects import ParseObjects
 
 SIZE40M = 40 * 1024 * 1024
+SIZE20M = 20 * 1024 * 1024
 
 
 class PoseEstimator:
@@ -50,6 +51,10 @@ class PoseEstimator:
         self.roi = None
         self.scale = None
         self.shift = None
+
+        self.depth = None
+        self.depth_lo = 500
+        self.depth_hi = 2500
 
         num_buffers = 2
         self._queue_used = Queue(num_buffers)
@@ -90,11 +95,8 @@ class PoseEstimator:
         )
 
         rospy.init_node('pose_estimator')
-        rospy.Subscriber('/camera/color/image_raw',
-                         Image,
-                         callback=self.callback,
-                         queue_size=1,
-                         buff_size=SIZE40M)
+        rospy.Subscriber('/camera/color/image_raw', Image, callback=self.rgb_callback, queue_size=1, buff_size=SIZE40M)
+        rospy.Subscriber('/camera/aligned_depth_to_color/image_raw', Image, callback=self.depth_callback, queue_size=1, buff_size=SIZE20M)
         self.pub = rospy.Publisher('/estimated_poses',
                                    Int64MultiArray,
                                    queue_size=1)
@@ -106,8 +108,12 @@ class PoseEstimator:
         rospy.loginfo('Pose Estimator Node is Up!')
         rospy.spin()
 
-    def callback(self, data):
+    def rgb_callback(self, data):
+        if self.depth is None:
+            return
+
         img = self.cv_bridge.imgmsg_to_cv2(data, desired_encoding='rgb8')
+        img *= np.logical_and(self.depth_lo < self.depth, self.depth < self.depth_hi)
 
         if self.roi is None:
             h, w = img.shape[:2]
@@ -126,6 +132,9 @@ class PoseEstimator:
         buf.copy_(torch.from_numpy(img.transpose(2, 0, 1)))
 
         self._queue_ready.put((data.header, buf))
+
+    def depth_callback(self, data):
+        self.depth = self.cv_bridge.imgmsg_to_cv2(data, desired_encoding='passthrough')[..., None]
 
     def _estimate(self):
         while not rospy.is_shutdown():
