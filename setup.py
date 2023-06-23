@@ -1,11 +1,10 @@
-# # ! DO NOT MANUALLY INVOKE THIS setup.py, USE CATKIN INSTEAD
 from distutils.core import setup
+
 from catkin_pkg.python_setup import generate_distutils_setup
 
-setup_args = generate_distutils_setup(
-    packages=[
-        'np_bridge'
-    ],
-    package_dir={'': 'include'},
+d = generate_distutils_setup(
+    packages=['human_pose_tracking'],
+    package_dir={'': 'src'}
 )
-setup(**setup_args)
+
+setup(**d)

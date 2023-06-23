@@ -1,0 +1,3 @@
+std_msgs/Float64MultiArray poses
+std_msgs/UInt16MultiArray depths
+int8 highlight
