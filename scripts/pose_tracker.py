@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 from dataclasses import dataclass
 
@@ -17,19 +17,21 @@ from std_msgs.msg import Float64MultiArray
 class PoseTracker:
     """Pose Tracker Node"""
 
-    score_th: float = 0.7
+    score_th: float = 0.5
     """Score threshold for a keypoint to be considered valid."""
     valid_th: float = 0.7
     """Valid keypoint percentage threshold for a pose to be considered valid."""
-    timeout: float = 1
-    """Timeout for a pose to be considered lost (measured in seconds)."""
+    timeout_tracking: float = 2
+    """Timeout for losing track of a pose (measured in seconds)."""
+    timeout_highlight: float = 3
+    """Timeout for losing highlight of a pose (measured in seconds)."""
     depth_lo: int = 1000
     """Depth lower bound for a pose to be highlighted (measured in millimeters)."""
     depth_hi: int = 2000
     """Depth upper bound for a pose to be highlighted (measured in millimeters)."""
 
     def main(self):
-        self.tracker = KeypointsTracker(depth_lo=self.depth_lo, depth_hi=self.depth_hi, timeout=self.timeout)
+        self.tracker = KeypointsTracker(depth_lo=self.depth_lo, depth_hi=self.depth_hi, timeout_tracking=self.timeout_tracking, timeout_highlight=self.timeout_highlight)
         self.kids_validation = (0, 5, 6, 7, 8, 9, 10)
         self.kids_tracking = (0, 1, 2, 3, 4, 5, 6, 11, 12, 13, 14, 15, 16)
         self.depth = None
