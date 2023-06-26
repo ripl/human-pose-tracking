@@ -8,7 +8,7 @@ import rospy
 import tyro
 from cv_bridge import CvBridge
 from human_pose_tracking.msg import TrackedPoses
-from human_pose_tracking.pose_utils import pose_vis, pose_vis_highlight
+from human_pose_tracking.pose_utils import keypoints_visible, pose_vis, pose_vis_highlight
 from mmengine.structures import InstanceData
 from np_bridge import to_np_array
 from sensor_msgs.msg import Image
@@ -50,7 +50,7 @@ class PoseVisualizer:
         if self.img is None:
             return
         poses = to_np_array(data.poses)
-        instances = InstanceData(keypoints=poses[..., :2], keypoint_scores=poses[..., 2])
+        instances = InstanceData(keypoints=poses[..., :2], keypoint_scores=poses[..., 2], keypoints_visible=np.broadcast_to(keypoints_visible, poses.shape[:-1]))
         highlight_mask = np.arange(len(instances)) == data.highlight
         img = self.pose_vis._draw_instances_kpts(self.img, instances[~highlight_mask])
         img = self.pose_vis_highlight._draw_instances_kpts(img, instances[highlight_mask])
