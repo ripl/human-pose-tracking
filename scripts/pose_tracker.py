@@ -25,9 +25,9 @@ class PoseTracker:
     """Timeout for losing track of a pose (measured in seconds)."""
     timeout_highlight: float = 3
     """Timeout for losing highlight of a pose (measured in seconds)."""
-    depth_lo: int = 1000
+    depth_lo: int = 1500
     """Depth lower bound for a pose to be highlighted (measured in millimeters)."""
-    depth_hi: int = 2000
+    depth_hi: int = 2500
     """Depth upper bound for a pose to be highlighted (measured in millimeters)."""
 
     def main(self):

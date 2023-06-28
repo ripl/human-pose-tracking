@@ -19,9 +19,9 @@ class PoseEstimator:
 
     depth_masking: bool = False
     """Whether to apply depth-guided masking to the RGB image before pose detection."""
-    depth_lo: int = 500
+    depth_lo: int = 1000
     """Depth lower bound of the depth-guided masking (measured in millimeters)."""
-    depth_hi: int = 2500
+    depth_hi: int = 3000
     """Depth upper bound of the depth-guided masking (measured in millimeters)."""
 
     def main(self):
