@@ -17,7 +17,7 @@ from std_msgs.msg import Float64MultiArray
 class PoseEstimator:
     """Pose Estimator Node"""
 
-    depth_masking: bool = False
+    depth_masking: bool = True
     """Whether to apply depth-guided masking to the RGB image before pose detection."""
     depth_lo: int = 1000
     """Depth lower bound of the depth-guided masking (measured in millimeters)."""

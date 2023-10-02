@@ -29,9 +29,11 @@ class PoseTracker:
     """Depth lower bound for a pose to be highlighted (measured in millimeters)."""
     depth_hi: int = 2500
     """Depth upper bound for a pose to be highlighted (measured in millimeters)."""
+    border_ratio: float = 0.3
+    """(Horizontal) border ratio for a pose to be highlighted."""
 
     def main(self):
-        self.tracker = KeypointsTracker(depth_lo=self.depth_lo, depth_hi=self.depth_hi, timeout_tracking=self.timeout_tracking, timeout_highlight=self.timeout_highlight)
+        self.tracker = KeypointsTracker(self.depth_lo, self.depth_hi, self.border_ratio, self.timeout_tracking, self.timeout_highlight)
         self.kids_validation = (0, 5, 6, 7, 8, 9, 10)
         self.kids_tracking = (0, 1, 2, 3, 4, 5, 6, 11, 12, 13, 14, 15, 16)
         self.depth = None
@@ -44,12 +46,15 @@ class PoseTracker:
         rospy.spin()
 
     def depth_callback(self, data):
-        self.depth = self.cv_bridge.imgmsg_to_cv2(data)
+        depth = self.cv_bridge.imgmsg_to_cv2(data)
+        if self.depth is None:
+            self.img_h, self.img_w = depth.shape
+            self.tracker.set_img_width(self.img_w)
+        self.depth = depth
 
     def pose_callback(self, data):
         if self.depth is None:
             return
-        h, w = self.depth.shape
         poses = to_np_array(data)
         poses = poses[(poses[:, self.kids_validation, 2] > self.score_th).mean(axis=-1) > self.valid_th]
         n_poses, n_kpts = poses.shape[:-1]
@@ -57,7 +62,7 @@ class PoseTracker:
         for i in range(n_poses):
             for j in range(n_kpts):
                 x, y = poses[i, j, :2].round().astype(int)
-                if 0 <= x < w and 0 <= y < h and poses[i, j, 2] > self.score_th:
+                if 0 <= x < self.img_w and 0 <= y < self.img_h and poses[i, j, 2] > self.score_th:
                     depths[i, j] = self.depth[y, x]
         highlight = self.tracker.update(poses[:, self.kids_tracking, :2], [np.median(depth[depth > 0]) for depth in depths[:, self.kids_tracking]], rospy.get_time())
         self.pub.publish(TrackedPoses(poses=to_ros_array(poses), depths=to_ros_array(depths), highlight=highlight))

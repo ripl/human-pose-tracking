@@ -57,6 +57,6 @@ def pose_vis_highlight():
                              (51, 153, 255),
                              (51, 153, 255))),
         skeleton=skeleton_cfg,
-        line_width=5,
-        radius=6,
+        line_width=6,
+        radius=8,
     )

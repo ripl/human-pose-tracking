@@ -3,13 +3,18 @@ from scipy.optimize import linear_sum_assignment
 
 
 class KeypointsTracker:
-    def __init__(self, depth_lo, depth_hi, timeout_tracking, timeout_highlight):
+    def __init__(self, depth_lo, depth_hi, border_ratio, timeout_tracking, timeout_highlight):
         self.depth_lo = depth_lo
         self.depth_hi = depth_hi
+        self.border_ratio = border_ratio
         self.timeout_tracking = timeout_tracking
         self.timeout_highlight = timeout_highlight
         self.next_obj_id = 0
         self.objs = {}
+
+    def set_img_width(self, img_w):
+        self.border_lo = np.round(img_w * self.border_ratio).astype(int)
+        self.border_hi = img_w - self.border_lo
 
     def register(self, kpts, t):
         # [kpts, last_seen, last_highlight]
@@ -38,7 +43,7 @@ class KeypointsTracker:
             obj = self.objs[obj_ids[col]]
             obj[0] = kpts_lst[row]
             obj[1] = t
-            if self.depth_lo < depth_lst[row] < self.depth_hi:
+            if self.depth_lo < depth_lst[row] < self.depth_hi and self.border_lo <= np.median(kpts_lst[row, :, 0]) < self.border_hi:
                 if obj[2] is not None and t - obj[2] < self.timeout_highlight and (earliest_highlight is None or obj[2] < earliest_highlight):
                     highlight = row
                     hightlight_obj = obj
@@ -55,7 +60,7 @@ class KeypointsTracker:
         for row in set(range(D.shape[0])) - set(rows):
             obj = self.register(kpts_lst[row], t)
             depth = depth_lst[row]
-            if should_highlight and self.depth_lo < depth < self.depth_hi and (min_depth is None or depth < min_depth):
+            if should_highlight and self.depth_lo < depth < self.depth_hi and (min_depth is None or depth < min_depth) and self.border_lo <= np.median(kpts_lst[row, :, 0]) < self.border_hi:
                 highlight = row
                 hightlight_obj = obj
                 min_depth = depth
