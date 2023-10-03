@@ -13,7 +13,7 @@ class KeypointsTracker:
         self.objs = {}
 
     def set_img_width(self, img_w):
-        self.border_lo = np.round(img_w * self.border_ratio).astype(int)
+        self.border_lo = round(img_w * self.border_ratio)
         self.border_hi = img_w - self.border_lo
 
     def register(self, kpts, t):
