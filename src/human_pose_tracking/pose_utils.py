@@ -10,11 +10,11 @@ keypoints_visible = np.array([False] * 5 + [True] * 12)
 
 def pose_vis():
     return PoseLocalVisualizer(
-        kpt_color='gray',
-        link_color='gray',
+        kpt_color=[[100] * 3] * 17,
+        link_color=[[100] * 3] * 19,
         skeleton=skeleton_cfg,
-        line_width=3,
-        radius=4
+        line_width=6,
+        radius=9
     )
 
 
@@ -57,6 +57,6 @@ def pose_vis_highlight():
                              (51, 153, 255),
                              (51, 153, 255))),
         skeleton=skeleton_cfg,
-        line_width=6,
-        radius=8,
+        line_width=12,
+        radius=18,
     )
