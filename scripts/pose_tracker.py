@@ -10,7 +10,7 @@ from human_pose_tracking.keypoints_tracker import KeypointsTracker
 from human_pose_tracking.msg import TrackedPoses
 from np_bridge import to_np_array, to_ros_array
 from sensor_msgs.msg import Image
-from std_msgs.msg import Float64MultiArray
+from std_msgs.msg import Float32MultiArray
 
 
 @dataclass
@@ -40,7 +40,7 @@ class PoseTracker:
         self.cv_bridge = CvBridge()
         rospy.init_node('pose_tracker')
         rospy.Subscriber('/camera/aligned_depth_to_color/image_raw', Image, callback=self.depth_callback, queue_size=1, buff_size=1 << 23)
-        rospy.Subscriber('/estimated_poses', Float64MultiArray, callback=self.pose_callback, queue_size=1)
+        rospy.Subscriber('/estimated_poses', Float32MultiArray, callback=self.pose_callback, queue_size=1)
         self.pub = rospy.Publisher('/tracked_poses', TrackedPoses, queue_size=1)
         rospy.loginfo('Pose Tracker Node is Up!')
         rospy.spin()

@@ -9,8 +9,9 @@ from cv_bridge import CvBridge
 from human_pose_tracking.pose_utils import pose_vis_highlight
 from mmpose.apis import MMPoseInferencer
 from np_bridge import to_ros_array
+from scipy.stats.mstats import gmean
 from sensor_msgs.msg import Image
-from std_msgs.msg import Float64MultiArray
+from std_msgs.msg import Float32MultiArray
 
 
 @dataclass
@@ -26,7 +27,7 @@ class PoseEstimator:
 
     def main(self):
         self.inferencer = MMPoseInferencer(pose2d='human')
-        self.pose_vis_highlight = pose_vis_highlight()
+        self.pose_vis_highlight = None
         self.cv_bridge = CvBridge()
         self.is_busy = False
         rospy.init_node('pose_estimator')
@@ -36,7 +37,7 @@ class PoseEstimator:
                 self.depth = self.cv_bridge.imgmsg_to_cv2(data)
             rospy.Subscriber('/camera/aligned_depth_to_color/image_raw', Image, callback=depth_callback, queue_size=1, buff_size=1 << 23)
             self.depth = None
-        self.pub = rospy.Publisher('/estimated_poses', Float64MultiArray, queue_size=1)
+        self.pub = rospy.Publisher('/estimated_poses', Float32MultiArray, queue_size=1)
         self.pub_vis = rospy.Publisher('/estimated_poses_vis', Image, queue_size=1)
         rospy.loginfo('Pose Estimator Node is Up!')
         rospy.spin()
@@ -46,6 +47,8 @@ class PoseEstimator:
             return
         self.is_busy = True
         img = self.cv_bridge.imgmsg_to_cv2(data).copy()
+        if self.pose_vis_highlight is None:
+            self.pose_vis_highlight = pose_vis_highlight(gmean(img.shape[:2]))
         if self.depth_masking:
             mask = np.logical_or(self.depth < self.depth_lo, self.depth > self.depth_hi)
             img[mask] = img[mask].mean(axis=0)

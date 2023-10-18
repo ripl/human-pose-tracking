@@ -11,6 +11,7 @@ from human_pose_tracking.msg import TrackedPoses
 from human_pose_tracking.pose_utils import keypoints_visible, pose_vis, pose_vis_highlight
 from mmengine.structures import InstanceData
 from np_bridge import to_np_array
+from scipy.stats.mstats import gmean
 from sensor_msgs.msg import Image
 
 
@@ -24,8 +25,7 @@ class PoseVisualizer:
     """Height of the display device."""
 
     def main(self):
-        self.pose_vis = pose_vis()
-        self.pose_vis_highlight = pose_vis_highlight()
+        self.pose_vis = None
         self.img = None
         self.cv_bridge = CvBridge()
         rospy.init_node('pose_visualizer')
@@ -52,6 +52,10 @@ class PoseVisualizer:
         poses = to_np_array(data.poses)
         instances = InstanceData(keypoints=poses[..., :2], keypoint_scores=poses[..., 2], keypoints_visible=np.broadcast_to(keypoints_visible, poses.shape[:-1]))
         highlight_mask = np.arange(len(instances)) == data.highlight
+        if self.pose_vis is None:
+            l = gmean(self.img.shape[:2])
+            self.pose_vis = pose_vis(l)
+            self.pose_vis_highlight = pose_vis_highlight(l)
         img = self.pose_vis._draw_instances_kpts(self.img, instances[~highlight_mask])
         img = self.pose_vis_highlight._draw_instances_kpts(img, instances[highlight_mask])
         img_mean = self.img.mean(axis=(0, 1))
