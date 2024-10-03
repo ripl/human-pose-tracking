@@ -12,6 +12,7 @@ from np_bridge import to_ros_array
 from scipy.stats.mstats import gmean
 from sensor_msgs.msg import Image
 from std_msgs.msg import Float32MultiArray
+from tqdm import tqdm
 
 
 @dataclass
@@ -29,6 +30,7 @@ class PoseEstimator:
         self.inferencer = MMPoseInferencer(pose2d='human')
         self.pose_vis_highlight = None
         self.cv_bridge = CvBridge()
+        self.cnt = tqdm(desc='Pose Estimation', unit=' frames')
         self.is_busy = False
         rospy.init_node('pose_estimator')
         rospy.Subscriber('/camera/color/image_raw', Image, callback=self.rgb_callback, queue_size=1, buff_size=1 << 23)
@@ -52,8 +54,9 @@ class PoseEstimator:
         if self.depth_masking:
             mask = np.logical_or(self.depth < self.depth_lo, self.depth > self.depth_hi)
             img[mask] = img[mask].mean(axis=0)
-        pred_instances = next(self.inferencer(img, return_datasample=True))['predictions'][0].pred_instances
+        pred_instances = next(self.inferencer(img, return_datasamples=True))['predictions'][0].pred_instances
         self.is_busy = False
+        self.cnt.update()
         self.pub.publish(to_ros_array(np.concatenate((pred_instances.keypoints, pred_instances.keypoint_scores[..., None]), axis=-1)))
         img = self.pose_vis_highlight._draw_instances_kpts(img, pred_instances)
         self.pub_vis.publish(self.cv_bridge.cv2_to_imgmsg(img[:, ::-1], encoding='rgb8', header=data.header))
